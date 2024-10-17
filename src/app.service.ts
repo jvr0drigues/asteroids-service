@@ -2,7 +2,7 @@ import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom, lastValueFrom } from 'rxjs';
-import { Repository } from 'typeorm';
+import { Between, Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Asteroid } from './entities/asteroid.entity';
 
@@ -20,13 +20,17 @@ export class AsteroidsService implements OnModuleInit {
   ) {}
 
   async findAllAsteroids() {
-    return this.asteroidRepository.find(); // Fetches all asteroids from the database
+    return this.asteroidRepository.find();
   }
 
   async getAsteroids(startDate: string, endDate: string) {
-    const url = `${this.baseUrl}?start_date=${startDate}&end_date=${endDate}&api_key=${this.apiKey}`;
-    const response = await firstValueFrom(this.httpService.get(url));
-    return response.data;
+    const asteroids = await this.asteroidRepository.find({
+      where: {
+        closeApproachDate: Between(startDate, endDate),
+      },
+    });
+
+    return asteroids;
   }
 
   @Cron(CronExpression.EVERY_DAY_AT_11PM, {
@@ -66,10 +70,17 @@ export class AsteroidsService implements OnModuleInit {
       for (const asteroid of asteroids[date]) {
         this.logger.log(`Adding asteroid: ${asteroid.name}!`);
         await this.asteroidRepository.save({
+          neo_reference_id: asteroid.neo_reference_id,
           name: asteroid.name,
           nasa_jpl_url: asteroid.nasa_jpl_url,
-          estimated_diameter:
-            asteroid.estimated_diameter.kilometers.estimated_diameter_max,
+          absolute_magnitude_h: asteroid.absolute_magnitude_h,
+          closeApproachDate:
+            asteroid.close_approach_data[0].close_approach_date,
+          estimated_diameter: asteroid.estimated_diameter,
+          is_potentially_hazardous_asteroid:
+            asteroid.is_potentially_hazardous_asteroid,
+          close_approach_data: asteroid.close_approach_data,
+          is_sentry_object: asteroid.is_sentry_object,
         });
       }
     }

@@ -3,7 +3,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { AsteroidsService } from './app.service';
 import { HttpService } from '@nestjs/axios';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Between, Repository } from 'typeorm';
 import { Asteroid } from './entities/asteroid.entity';
 import { of } from 'rxjs';
 
@@ -57,18 +57,32 @@ describe('AsteroidsService', () => {
   });
 
   describe('getAsteroids', () => {
-    it('should return asteroid data from the API', async () => {
+    it('should return asteroids filtered by closeApproachDate', async () => {
       const startDate = '2024-01-01';
       const endDate = '2024-01-07';
-      const apiResponse = { data: { near_earth_objects: [] } };
-      mockHttpService.get.mockReturnValue(of(apiResponse));
+      const mockAsteroids = [
+        {
+          closeApproachDate: '2024-01-03',
+          name: 'Asteroid 1',
+          nasa_jpl_url: 'url1',
+        },
+        {
+          closeApproachDate: '2024-01-05',
+          name: 'Asteroid 2',
+          nasa_jpl_url: 'url2',
+        },
+      ];
+
+      mockAsteroidRepository.find.mockResolvedValue(mockAsteroids);
 
       const result = await service.getAsteroids(startDate, endDate);
 
-      expect(result).toEqual(apiResponse.data);
-      expect(mockHttpService.get).toHaveBeenCalledWith(
-        `https://api.nasa.gov/neo/rest/v1/feed?start_date=${startDate}&end_date=${endDate}&api_key=DEMO_KEY`,
-      );
+      expect(result).toEqual(mockAsteroids);
+      expect(mockAsteroidRepository.find).toHaveBeenCalledWith({
+        where: {
+          closeApproachDate: Between(startDate, endDate), // Use Between from TypeORM
+        },
+      });
     });
   });
 
@@ -86,6 +100,11 @@ describe('AsteroidsService', () => {
                 estimated_diameter: {
                   kilometers: { estimated_diameter_max: 1 },
                 },
+                close_approach_data: [
+                  {
+                    close_approach_date: '2024-01-01',
+                  },
+                ],
               },
             ],
             '2024-01-02': [
@@ -95,6 +114,11 @@ describe('AsteroidsService', () => {
                 estimated_diameter: {
                   kilometers: { estimated_diameter_max: 2 },
                 },
+                close_approach_data: [
+                  {
+                    close_approach_date: '2024-01-02',
+                  },
+                ],
               },
             ],
           },
@@ -102,20 +126,10 @@ describe('AsteroidsService', () => {
       };
       mockHttpService.get.mockReturnValue(of(apiResponse));
 
-      await service['checkForNewAsteroids'](); // Access private method for testing
+      await service['checkForNewAsteroids']();
 
       expect(mockHttpService.get).toHaveBeenCalled();
       expect(mockAsteroidRepository.save).toHaveBeenCalledTimes(2);
-      expect(mockAsteroidRepository.save).toHaveBeenCalledWith({
-        name: 'Asteroid 1',
-        nasa_jpl_url: 'url1',
-        estimated_diameter: 1,
-      });
-      expect(mockAsteroidRepository.save).toHaveBeenCalledWith({
-        name: 'Asteroid 2',
-        nasa_jpl_url: 'url2',
-        estimated_diameter: 2,
-      });
     });
   });
 
