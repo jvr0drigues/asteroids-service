@@ -1,7 +1,7 @@
 import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { HttpService } from '@nestjs/axios';
-import { firstValueFrom, lastValueFrom } from 'rxjs';
+import { lastValueFrom } from 'rxjs';
 import { Between, Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Asteroid } from './entities/asteroid.entity';
